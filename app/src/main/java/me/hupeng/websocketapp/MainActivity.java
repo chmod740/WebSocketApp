@@ -8,13 +8,19 @@ import android.widget.EditText;
 import okhttp3.RequestBody;
 import okhttp3.ws.WebSocket;
 
+import java.net.URISyntaxException;
+
 
 public class MainActivity extends AppCompatActivity {
-    private WebSocketClient webSocketClient = WebSocketClient.getInstance();
+//    private WebSocketClient webSocketClient = WebSocketClient.getInstance();
+    private MessageWebSocketClient messageWebSocketClient;
     private Button button = null;
     private EditText editText = null;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        messageWebSocketClient = MessageWebSocketClient.getInstance();
+
+
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
@@ -25,7 +31,8 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View view) {
                 String s = editText.getText().toString();
                 RequestBody requestBody = RequestBody.create(WebSocket.TEXT,s);
-                webSocketClient.sendMessage(requestBody);
+//                webSocketClient.sendMessage(requestBody);
+                messageWebSocketClient.sendMsg(s);
             }
         });
     }
