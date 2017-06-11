@@ -7,8 +7,10 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
+import com.google.gson.Gson;
 import me.hupeng.websocketapp.MessageWebSocketClient;
 import me.hupeng.websocketapp.R;
+import me.hupeng.websocketapp.bean.User;
 import okhttp3.RequestBody;
 import okhttp3.ws.WebSocket;
 import org.xutils.view.annotation.ContentView;
@@ -49,12 +51,21 @@ public class MainActivity extends BaseActivity {
      * */
     @Event(value = R.id.btn_send, type = View.OnClickListener.class)
     private void onSendButtonCliock(View view){
-        messageWebSocketClient.sendMsg(etMessage.getText().toString(), sendMessageResultListener);
+        sendMessage(User.getCurrentUser(), 2, toString());
     }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        messageWebSocketClient = MessageWebSocketClient.getInstance();
+        messageWebSocketClient = MessageWebSocketClient.getInstance(User.getCurrentUser().getId());
+    }
+
+    private void sendMessage(User from, int to, String msg){
+        MessageWebSocketClient.Message message = new MessageWebSocketClient.Message();
+        message.setFrom(from.getId());
+        message.setTo(to);
+        message.setMessage(msg);
+        message.setOperate(MessageWebSocketClient.Message.SEND_MESSAGE);
+        messageWebSocketClient.sendMsg(new Gson().toJson(message), sendMessageResultListener);
     }
 }

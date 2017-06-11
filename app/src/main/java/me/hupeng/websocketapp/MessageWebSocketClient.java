@@ -207,6 +207,8 @@ public class MessageWebSocketClient {
          * */
         private String message;
 
+        private String accessKey;
+
         public int getOperate() {
             return operate;
         }
@@ -237,6 +239,14 @@ public class MessageWebSocketClient {
 
         public void setMessage(String message) {
             this.message = message;
+        }
+
+        public String getAccessKey() {
+            return accessKey;
+        }
+
+        public void setAccessKey(String accessKey) {
+            this.accessKey = accessKey;
         }
     }
 

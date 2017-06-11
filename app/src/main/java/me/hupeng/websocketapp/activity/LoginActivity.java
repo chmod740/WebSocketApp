@@ -11,6 +11,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import me.hupeng.websocketapp.Configuration;
 import me.hupeng.websocketapp.R;
+import me.hupeng.websocketapp.bean.User;
 import org.xutils.common.Callback;
 import org.xutils.http.RequestParams;
 import org.xutils.view.annotation.ContentView;
@@ -52,6 +53,7 @@ public class LoginActivity extends BaseActivity {
                     int code = jsonObject.get("code").getAsInt();
                     if (code == 0){
                         //执行登录成功操作
+                        User.setCurrentUser(jsonObject.get("data").getAsJsonObject().get("user").toString());
                         goHome();
 //                        Toast.makeText(LoginActivity.this,jsonObject.get("msg").getAsString(),Toast.LENGTH_SHORT).show();
                     }else {
