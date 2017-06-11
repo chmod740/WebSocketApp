@@ -3,6 +3,7 @@ package me.hupeng.websocketapp;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import com.google.gson.Gson;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 
@@ -17,11 +18,14 @@ public class MessageWebSocketClient {
 
     private boolean openStatus = false;
 
+    private static int userId;
+
     private MessageWebSocketClient(){
 
     }
 
-    public static MessageWebSocketClient getInstance(){
+    public static MessageWebSocketClient getInstance(int userId){
+        MessageWebSocketClient.userId = userId;
         if (MessageWebSocketClient.messageWebSocketClient == null){
             messageWebSocketClient = new MessageWebSocketClient();
             try {
@@ -47,6 +51,9 @@ public class MessageWebSocketClient {
                 public void onOpen(ServerHandshake serverHandshake) {
                     Log.i("MessageWebSocketClient","onOpen");
                     openStatus = true;
+
+                    //发送一个上线的消息给Socket服务器
+                    sendOnLineMessage();
                 }
 
                 @Override
@@ -136,21 +143,35 @@ public class MessageWebSocketClient {
                 handler.post(new Runnable() {
                     @Override
                     public void run() {
-                        if (MessageWebSocketClient.this.openStatus){
+                        if (openStatus){
                             try {
                                 webSocketClient.send(msg);
-                                MessageWebSocketClient.this.sendMessageResultListener.onSuccess(ts);
+                                sendMessageResultListener.onSuccess(ts);
                             }catch (Exception e){
                                 e.printStackTrace();
-                                MessageWebSocketClient.this.sendMessageResultListener.onFail(ts);
+                                sendMessageResultListener.onFail(ts);
                             }
                         }else {
-                            MessageWebSocketClient.this.sendMessageResultListener.onFail(ts);
+                            sendMessageResultListener.onFail(ts);
                         }
                     }
                 });
             }
         }).start();
         return ts;
+    }
+
+    private void sendOnLineMessage(){
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                if (openStatus){
+                    Message message = new Message();
+                    message.setOperate(Message.ON_LINE);
+                    message.setFrom(userId);
+                    webSocketClient.send(new Gson().toJson(message));
+                }
+            }
+        }).start();
     }
 }
