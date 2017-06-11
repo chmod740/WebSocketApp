@@ -1,5 +1,7 @@
 package me.hupeng.websocketapp;
 
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
@@ -13,6 +15,8 @@ import java.net.URISyntaxException;
 public class MessageWebSocketClient {
     private static MessageWebSocketClient messageWebSocketClient = null;
 
+    private boolean openStatus = false;
+
     private MessageWebSocketClient(){
 
     }
@@ -22,7 +26,7 @@ public class MessageWebSocketClient {
             messageWebSocketClient = new MessageWebSocketClient();
             try {
                 messageWebSocketClient.initSocketClient();
-                messageWebSocketClient .connect();
+                messageWebSocketClient.connect();
             } catch (URISyntaxException e) {
                 e.printStackTrace();
             }
@@ -41,25 +45,28 @@ public class MessageWebSocketClient {
             webSocketClient = new WebSocketClient(new URI(address)) {
                 @Override
                 public void onOpen(ServerHandshake serverHandshake) {
-                    Log.i("MessageWebSocketClient","");
+                    Log.i("MessageWebSocketClient","onOpen");
+                    openStatus = true;
                 }
 
                 @Override
                 public void onMessage(String s) {
-                    Log.i("MessageWebSocketClient","");
+                    Log.i("MessageWebSocketClient","onMessage");
+                    Log.i("WebSocket收到消息", s);
                 }
 
 
                 @Override
                 public void onClose(int i, String s, boolean remote) {
-                    Log.i("MessageWebSocketClient","");
+                    Log.i("MessageWebSocketClient","onClose");
+                    openStatus = false;
                     reConnect();
                 }
 
 
                 @Override
                 public void onError(Exception e) {
-                    Log.i("MessageWebSocketClient","");
+                    Log.i("MessageWebSocketClient","onError");
                 }
             };
         }
@@ -72,6 +79,7 @@ public class MessageWebSocketClient {
             @Override
             public void run() {
                 webSocketClient.connect();
+
             }
         }.start();
     }
@@ -99,14 +107,50 @@ public class MessageWebSocketClient {
         }
     }
 
+    public static interface SendMessageResultListener{
+        /**
+         * 消息发送成功回调
+         * */
+        public void onSuccess(long ts);
 
+        /**
+         * 消息发送失败回调
+         * */
+        public void onFail(long ts);
+    }
 
-    public boolean sendMsg(String msg) {
-        try {
-            webSocketClient.send(msg);
-            return true;
-        }catch (Exception e){
-            return false;
+    private SendMessageResultListener sendMessageResultListener = null;
+
+    public synchronized long sendMsg(final String msg, SendMessageResultListener listener) {
+        final long ts = System.currentTimeMillis();
+        /**
+         * 设置发送消息的监听器
+         * */
+        if (this.sendMessageResultListener == null && listener != null){
+            this.sendMessageResultListener = listener;
         }
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                Handler handler = new Handler(Looper.getMainLooper());
+                handler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (MessageWebSocketClient.this.openStatus){
+                            try {
+                                webSocketClient.send(msg);
+                                MessageWebSocketClient.this.sendMessageResultListener.onSuccess(ts);
+                            }catch (Exception e){
+                                e.printStackTrace();
+                                MessageWebSocketClient.this.sendMessageResultListener.onFail(ts);
+                            }
+                        }else {
+                            MessageWebSocketClient.this.sendMessageResultListener.onFail(ts);
+                        }
+                    }
+                });
+            }
+        }).start();
+        return ts;
     }
 }
