@@ -1,31 +1,30 @@
 package me.hupeng.websocketapp.activity;
 
-import android.support.v7.app.AppCompatActivity;
+
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
+
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import me.hupeng.websocketapp.MessageWebSocketClient;
+import me.hupeng.websocketapp.websocket.Message;
+import me.hupeng.websocketapp.websocket.MessageWebSocketClient;
 import me.hupeng.websocketapp.R;
 import me.hupeng.websocketapp.bean.User;
-import okhttp3.RequestBody;
-import okhttp3.ws.WebSocket;
+
+import me.hupeng.websocketapp.websocket.MyMessageWebSocketClient;
 import org.xutils.view.annotation.ContentView;
 import org.xutils.view.annotation.Event;
 import org.xutils.view.annotation.ViewInject;
 
-import java.net.URISyntaxException;
+import java.util.Date;
 
 
 @ContentView(R.layout.activity_main)
 public class MainActivity extends BaseActivity {
-//    private WebSocketClient webSocketClient = WebSocketClient.getInstance();
-    private MessageWebSocketClient messageWebSocketClient;
-
     @ViewInject(R.id.btn_send)
     private Button btnSend;
 
@@ -34,6 +33,59 @@ public class MainActivity extends BaseActivity {
 
     @ViewInject(R.id.tv_message)
     private TextView tvMessage;
+
+
+    private MessageWebSocketClient messageWebSocketClient;
+    private Gson gson = new GsonBuilder().setDateFormat("yyyy-MM-dd HH:mm:ss").create();
+
+    private MessageWebSocketClient.MessageEncoder messageEncoder = new MessageWebSocketClient.MessageEncoder() {
+        @Override
+        public String encode(Object s) {
+            if(s instanceof Message){
+                return gson.toJson(s);
+            }
+            return null;
+        }
+    };
+
+    private MessageWebSocketClient.MessageDecoder messageDecoder = new MessageWebSocketClient.MessageDecoder() {
+        @Override
+        public Object decode(String s) {
+            try{
+                return gson.fromJson(s, Message.class);
+            }catch (Exception e){
+                e.printStackTrace();
+            }
+            return null;
+        }
+    };
+
+    private MessageWebSocketClient.ConnectStatusListener connectStatusListener = new MessageWebSocketClient.ConnectStatusListener() {
+        @Override
+        public void onConnect() {
+            Message message = new Message();
+            message.setFrom(User.getCurrentUser().getId());
+            message.setSendTime(new Date(System.currentTimeMillis()));
+            message.setOperate(Message.ON_LINE);
+            messageWebSocketClient.sendMessage(message, null);
+        }
+
+        @Override
+        public void onDisconnect() {
+
+        }
+    };
+
+    private MessageWebSocketClient.MessageListener messageListener = new MessageWebSocketClient.MessageListener() {
+        @Override
+        public void onMessage(Object object) {
+            Message message = (Message) object;
+//            Toast.makeText(MainActivity.this, message.getMessage(), Toast.LENGTH_SHORT).show();
+            tvMessage.setText(tvMessage.getText().toString() + "\n" + message.getMessage());
+        }
+    };
+
+
 
     private MessageWebSocketClient.SendMessageResultListener sendMessageResultListener= new MessageWebSocketClient.SendMessageResultListener() {
         @Override
@@ -52,24 +104,24 @@ public class MainActivity extends BaseActivity {
      * */
     @Event(value = R.id.btn_send, type = View.OnClickListener.class)
     private void onSendButtonCliock(View view){
-        sendMessage(User.getCurrentUser(), 2, etMessage.getText().toString());
+        Message message = new Message();
+        message.setFrom(User.getCurrentUser().getId());
+        message.setTo(User.getCurrentUser().getId());
+        message.setOperate(Message.SEND_MESSAGE);
+        message.setAccessKey("");
+        message.setMessage(etMessage.getText().toString());
+        message.setTo(1);
+        messageWebSocketClient.sendMessage(message, null);
     }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-//        messageWebSocketClient = MessageWebSocketClient.getInstance(User.getCurrentUser().getId());
+        messageWebSocketClient = MyMessageWebSocketClient.getInstance(User.getCurrentUser().getId());
+        messageWebSocketClient.setMessageDecoder(messageDecoder);
+        messageWebSocketClient.setMessageEncoder(messageEncoder);
+        messageWebSocketClient.addConnectStatusListener(connectStatusListener);
+        messageWebSocketClient.addMessageListener(messageListener);
     }
-
-    private void sendMessage(User from, int to, String msg){
-        MessageWebSocketClient.Message message = new MessageWebSocketClient.Message();
-        message.setFrom(from.getId());
-        message.setTo(to);
-        message.setMessage(msg);
-        message.setOperate(MessageWebSocketClient.Message.SEND_MESSAGE);
-        System.out.println( new GsonBuilder().setDateFormat("yyyy-MM-dd HH:mm:ss").create().toJson(message));
-        messageWebSocketClient.sendMsg(new Gson().toJson(message), sendMessageResultListener);
-    }
-
 
 }

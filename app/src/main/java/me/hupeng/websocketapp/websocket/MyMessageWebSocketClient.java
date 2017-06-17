@@ -1,15 +1,13 @@
-package me.hupeng.websocketapp;
-
-import java.net.URISyntaxException;
+package me.hupeng.websocketapp.websocket;
 
 /**
- * Created by HUPENG on 2017/6/12.
- */
+ * 实现单例
+ * */
 public class MyMessageWebSocketClient extends MessageWebSocketClient {
     private static MessageWebSocketClient messageWebSocketClient = null;
 
     protected MyMessageWebSocketClient(int userId) {
-        super(userId);
+        super();
     }
 
 
