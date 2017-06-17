@@ -3,48 +3,71 @@ package me.hupeng.websocketapp;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
-import com.google.gson.Gson;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
 
-/**
- * Created by HUPENG on 2017/6/5.
- */
-public class MessageWebSocketClient {
-    private static MessageWebSocketClient messageWebSocketClient = null;
+
+public abstract class MessageWebSocketClient {
+
+    protected int userId;
 
     private boolean openStatus = false;
 
-    private static int userId;
-
-    private MessageWebSocketClient(){
-
-    }
-
-    public static MessageWebSocketClient getInstance(int userId){
-        MessageWebSocketClient.userId = userId;
-        if (MessageWebSocketClient.messageWebSocketClient == null){
-            messageWebSocketClient = new MessageWebSocketClient();
-            try {
-                messageWebSocketClient.initSocketClient();
-                messageWebSocketClient.connect();
-            } catch (URISyntaxException e) {
-                e.printStackTrace();
-            }
-
+    protected MessageWebSocketClient(int userId){
+        this.userId = userId;
+        try {
+            initSocketClient();
+            connect();
+        } catch (URISyntaxException e) {
+            e.printStackTrace();
         }
-        return MessageWebSocketClient.messageWebSocketClient;
+
     }
 
+    public static interface ConnectStatusListener{
+        public void onConnect();
+        public void onDisconnect();
+    }
+
+    private List<ConnectStatusListener>connectStatusListeners = new ArrayList<>();
+
+    public void addConnectStatusListener(ConnectStatusListener connectStatusListener){
+        if (connectStatusListener != null){
+            connectStatusListeners.add(connectStatusListener);
+        }
+    }
+
+    public void removeConnectStatusListener(ConnectStatusListener connectStatusListener){
+        connectStatusListeners.remove(connectStatusListener);
+    }
+
+    public static interface MessageListener{
+        public void onMessage(Object object);
+    }
+
+    private List<MessageListener>messageListeners = new ArrayList<>();
+
+    public void addMessageListener(MessageListener messageListener){
+        if (messageListener != null){
+            messageListeners.add(messageListener);
+        }
+    }
+
+    public void removeMessageListener(MessageListener messageListener){
+        messageListeners.remove(messageListener);
+    }
 
 
     private WebSocketClient webSocketClient;
     private String address = "ws://192.168.3.228:8080/websocket";
 
-    private void initSocketClient() throws URISyntaxException {
+    protected void initSocketClient() throws URISyntaxException {
         if(webSocketClient == null) {
             webSocketClient = new WebSocketClient(new URI(address)) {
                 @Override
@@ -53,13 +76,33 @@ public class MessageWebSocketClient {
                     openStatus = true;
 
                     //发送一个上线的消息给Socket服务器
-                    sendOnLineMessage();
+//                    sendOnLineMessage();
+                    for (ConnectStatusListener connectStatusListener : connectStatusListeners){
+                        try {
+                            connectStatusListener.onConnect();
+                        }catch (Exception e){
+
+                        }
+                    }
                 }
 
                 @Override
                 public void onMessage(String s) {
                     Log.i("MessageWebSocketClient","onMessage");
                     Log.i("WebSocket收到消息", s);
+                    Object o = null;
+                    if (messageDecoder != null){
+                        o = messageDecoder.decode(s);
+                    }else {
+                        o = s;
+                    }
+                    for (MessageListener messageListener : messageListeners){
+                        try {
+                            messageListener.onMessage(o);
+                        }catch (Exception e){
+
+                        }
+                    }
                 }
 
 
@@ -68,6 +111,14 @@ public class MessageWebSocketClient {
                     Log.i("MessageWebSocketClient","onClose");
                     openStatus = false;
                     reConnect();
+
+                    for (ConnectStatusListener connectStatusListener : connectStatusListeners){
+                        try {
+                            connectStatusListener.onDisconnect();
+                        }catch (Exception e){
+
+                        }
+                    }
                 }
 
 
@@ -81,7 +132,7 @@ public class MessageWebSocketClient {
 
 
     //连接
-    private void connect() {
+    protected void connect() {
         new Thread(){
             @Override
             public void run() {
@@ -92,7 +143,7 @@ public class MessageWebSocketClient {
     }
 
 
-    //断开连接
+    //断线重连机制
     private void reConnect() {
         try {
             webSocketClient.close();
@@ -128,7 +179,7 @@ public class MessageWebSocketClient {
 
     private SendMessageResultListener sendMessageResultListener = null;
 
-    public synchronized long sendMsg(final String msg, SendMessageResultListener listener) {
+    public synchronized long sendMsg(final Message message, SendMessageResultListener listener) {
         final long ts = System.currentTimeMillis();
         /**
          * 设置发送消息的监听器
@@ -145,7 +196,11 @@ public class MessageWebSocketClient {
                     public void run() {
                         if (openStatus){
                             try {
-                                webSocketClient.send(msg);
+                                if (messageEncoder != null){
+                                    webSocketClient.send(messageEncoder.encode(message));
+                                }else {
+                                    webSocketClient.send(message.getMessage());
+                                }
                                 sendMessageResultListener.onSuccess(ts);
                             }catch (Exception e){
                                 e.printStackTrace();
@@ -161,19 +216,19 @@ public class MessageWebSocketClient {
         return ts;
     }
 
-    private void sendOnLineMessage(){
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                if (openStatus){
-                    Message message = new Message();
-                    message.setOperate(Message.ON_LINE);
-                    message.setFrom(userId);
-                    webSocketClient.send(new Gson().toJson(message));
-                }
-            }
-        }).start();
-    }
+//    private void sendOnLineMessage(){
+//        new Thread(new Runnable() {
+//            @Override
+//            public void run() {
+//                if (openStatus){
+//                    Message message = new Message();
+//                    message.setOperate(Message.ON_LINE);
+//                    message.setFrom(userId);
+//                    webSocketClient.send(new Gson().toJson(message));
+//                }
+//            }
+//        }).start();
+//    }
 
 
     public static class Message {
@@ -207,6 +262,14 @@ public class MessageWebSocketClient {
          * */
         private String message;
 
+        /**
+         * 发送时间
+         * */
+        private Date sendTime;
+
+        /**
+         * 访问密钥
+         * */
         private String accessKey;
 
         public int getOperate() {
@@ -241,6 +304,14 @@ public class MessageWebSocketClient {
             this.message = message;
         }
 
+        public Date getSendTime() {
+            return sendTime;
+        }
+
+        public void setSendTime(Date sendTime) {
+            this.sendTime = sendTime;
+        }
+
         public String getAccessKey() {
             return accessKey;
         }
@@ -248,6 +319,27 @@ public class MessageWebSocketClient {
         public void setAccessKey(String accessKey) {
             this.accessKey = accessKey;
         }
+    }
+
+
+    private MessageEncoder messageEncoder = null;
+
+    private MessageDecoder messageDecoder = null;
+
+    public static interface MessageEncoder{
+        public String encode(Object s);
+    }
+
+    public static interface MessageDecoder{
+        public Object decode(String s);
+    }
+
+    protected void setMessageEncoder(MessageEncoder messageEncoder){
+        this.messageEncoder = messageEncoder;
+    }
+
+    protected void setMessageDecoder(MessageDecoder messageDecoder){
+        this.messageDecoder = messageDecoder;
     }
 
 }

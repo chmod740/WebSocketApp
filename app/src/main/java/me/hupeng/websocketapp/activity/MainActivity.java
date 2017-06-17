@@ -8,6 +8,7 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import me.hupeng.websocketapp.MessageWebSocketClient;
 import me.hupeng.websocketapp.R;
 import me.hupeng.websocketapp.bean.User;
@@ -51,13 +52,13 @@ public class MainActivity extends BaseActivity {
      * */
     @Event(value = R.id.btn_send, type = View.OnClickListener.class)
     private void onSendButtonCliock(View view){
-        sendMessage(User.getCurrentUser(), 2, toString());
+        sendMessage(User.getCurrentUser(), 2, etMessage.getText().toString());
     }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        messageWebSocketClient = MessageWebSocketClient.getInstance(User.getCurrentUser().getId());
+//        messageWebSocketClient = MessageWebSocketClient.getInstance(User.getCurrentUser().getId());
     }
 
     private void sendMessage(User from, int to, String msg){
@@ -66,6 +67,9 @@ public class MainActivity extends BaseActivity {
         message.setTo(to);
         message.setMessage(msg);
         message.setOperate(MessageWebSocketClient.Message.SEND_MESSAGE);
+        System.out.println( new GsonBuilder().setDateFormat("yyyy-MM-dd HH:mm:ss").create().toJson(message));
         messageWebSocketClient.sendMsg(new Gson().toJson(message), sendMessageResultListener);
     }
+
+
 }
